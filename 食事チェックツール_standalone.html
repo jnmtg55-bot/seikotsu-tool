@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>食事チェック | 綾瀬かえで整骨院</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap');
+  * { box-sizing: border-box; }
+  body { font-family: 'Noto Sans JP', sans-serif; color: #232821; background:#F4F5EF; margin:0; padding:24px 16px 60px; }
+  .display { font-family: 'Zen Kaku Gothic New', sans-serif; }
+  .mono { font-family: 'Roboto Mono', monospace; }
+  .meal-tool { max-width: 480px; margin: 0 auto; }
+  button { font-family: inherit; }
+</style>
+</head>
+<body>
+
+<div class="meal-tool">
+
+  <div style="text-align:center; padding: 4px 0 20px; position:relative;">
+    <p class="display" style="font-size:20px; font-weight:700; letter-spacing:0.02em; margin:0; color:#2E4023;">食事チェック</p>
+    <p style="font-size:12.5px; color:#6B6F63; margin:6px 0 0;">写真を送るだけで、カロリー概算と食べ方のアドバイス</p>
+    <button id="settings-btn" title="APIキー設定" style="position:absolute; top:0; right:0; width:30px; height:30px; border-radius:50%; border:1px solid #D8D6CC; background:#fff; color:#6B6F63; font-size:14px; cursor:pointer;">⚙</button>
+  </div>
+
+  <!-- 設定パネル -->
+  <div id="settings-panel" style="display:none; background:#fff; border:1px solid #D8D6CC; border-radius:10px; padding:16px; margin-bottom:16px;">
+    <p style="font-size:13px; font-weight:700; margin:0 0 8px; color:#2E4023;">Anthropic APIキー設定</p>
+    <p style="font-size:11.5px; color:#8B8F80; margin:0 0 10px; line-height:1.6;">既存のLINEツールと同じAPIキーを入力してください。キーはこの端末のブラウザ内にのみ保存され、外部には送信されません。</p>
+    <input type="password" id="api-key-input" placeholder="sk-ant-..." style="width:100%; height:38px; border:1px solid #D8D6CC; border-radius:6px; padding:0 10px; font-size:13px; margin-bottom:8px;">
+    <div style="display:flex; gap:8px;">
+      <button id="save-key-btn" style="flex:1; height:36px; border-radius:6px; border:1.5px solid #2E4023; background:#2E4023; color:#fff; font-size:13px; cursor:pointer;">保存</button>
+      <button id="clear-key-btn" style="height:36px; padding:0 14px; border-radius:6px; border:1px solid #D8D6CC; background:#fff; color:#8B0000; font-size:13px; cursor:pointer;">削除</button>
+    </div>
+    <p id="key-status" style="font-size:11.5px; color:#6B6F63; margin:8px 0 0;"></p>
+  </div>
+
+  <div id="no-key-notice" style="display:none; background:#FFF8E8; border:1px solid #E8D9A8; border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:#5B4A1F; line-height:1.6;">
+    右上の ⚙ からAPIキーを設定すると使えるようになります。
+  </div>
+
+  <div id="upload-zone" style="border:1.5px dashed #A9B39B; border-radius:10px; padding:28px 16px; text-align:center; background:#F9F9F5; cursor:pointer; transition:border-color .15s;">
+    <input type="file" id="file-input" accept="image/*" style="display:none;">
+    <div id="upload-prompt">
+      <div style="width:44px; height:44px; border-radius:50%; background:#E8ECDF; margin:0 auto; display:flex; align-items:center; justify-content:center;">
+        <div style="width:20px; height:16px; border:2px solid #7C8A6C; border-radius:3px; position:relative;"><div style="position:absolute; width:8px; height:8px; border-radius:50%; border:2px solid #7C8A6C; top:2px; left:4px;"></div></div>
+      </div>
+      <p style="font-size:14px; font-weight:500; margin:10px 0 4px; color:#2E4023;">食事の写真をアップロード</p>
+      <p style="font-size:12px; color:#8B8F80; margin:0;">タップして選択、またはドラッグ&ドロップ</p>
+    </div>
+    <div id="preview-wrap" style="display:none;">
+      <img id="preview-img" style="max-width:100%; max-height:220px; border-radius:8px; display:block; margin:0 auto;">
+    </div>
+  </div>
+
+  <div style="display:flex; gap:10px; margin-top:14px;">
+    <button id="analyze-btn" disabled style="flex:1; height:42px; border-radius:8px; border:1.5px solid #2E4023; background:#2E4023; color:#F9F9F5; font-size:14px; font-weight:500; cursor:pointer; opacity:0.4;">
+      解析する
+    </button>
+    <button id="reset-btn" style="display:none; height:42px; padding:0 16px; border-radius:8px; border:0.5px solid #C9CBC0; background:#fff; color:#5B5F53; font-size:14px; cursor:pointer;">
+      やり直す
+    </button>
+  </div>
+
+  <div id="status" style="display:none; text-align:center; padding:24px 0; font-size:13px; color:#8B8F80;"></div>
+
+  <div id="error-box" style="display:none; margin-top:14px; padding:12px 14px; border-radius:8px; background:#FCEBEB; color:#501313; font-size:13px;"></div>
+
+  <div id="result" style="display:none; margin-top:20px;">
+
+    <div style="border:2px solid #2E4023; border-radius:2px; padding:0; overflow:hidden; background:#fff;">
+      <div style="background:#2E4023; color:#F9F9F5; padding:8px 14px;">
+        <p class="display" style="margin:0; font-size:14px; font-weight:700; letter-spacing:0.05em;">栄養概算ラベル</p>
+      </div>
+
+      <div style="padding:14px 16px 4px;">
+        <p style="font-size:11.5px; color:#6B6F63; margin:0 0 2px;">認識したもの</p>
+        <p id="r-dishes" style="font-size:13.5px; margin:0 0 12px; line-height:1.6;"></p>
+      </div>
+
+      <div style="border-top:3px solid #232821; margin:0 16px;"></div>
+
+      <div style="display:flex; justify-content:space-between; align-items:baseline; padding:12px 16px; border-bottom:1px solid #D8D6CC;">
+        <span style="font-size:13px; font-weight:700;">推定カロリー</span>
+        <span class="mono" id="r-cal" style="font-size:26px; font-weight:700; color:#2E4023;"></span>
+      </div>
+
+      <div style="padding:12px 16px; border-bottom:1px solid #D8D6CC; background:#F1F3EC;">
+        <p id="r-verdict" style="font-size:14px; font-weight:700; margin:0; color:#2E4023;"></p>
+      </div>
+
+      <div style="padding:10px 16px; border-bottom:1px solid #D8D6CC;">
+        <p style="font-size:11.5px; color:#6B6F63; margin:0 0 4px;">今すぐやること</p>
+        <p id="r-actions" style="font-size:13px; margin:0; line-height:1.7; white-space:pre-line;"></p>
+      </div>
+
+      <div style="padding:10px 16px; border-bottom:1px solid #D8D6CC;">
+        <p style="font-size:11.5px; color:#6B6F63; margin:0 0 3px;">食べる順番</p>
+        <p id="r-order" style="font-size:13px; margin:0; line-height:1.6;"></p>
+      </div>
+
+      <div style="padding:10px 16px; border-bottom:1px solid #D8D6CC;">
+        <p style="font-size:11.5px; color:#6B6F63; margin:0 0 3px;">次回のヒント</p>
+        <p id="r-tips" style="font-size:13px; margin:0; line-height:1.6;"></p>
+      </div>
+
+      <div style="border-top:3px solid #232821; margin:2px 16px 0;"></div>
+
+      <div style="padding:10px 16px 2px;">
+        <p style="font-size:11.5px; color:#6B6F63; margin:0; font-weight:700;">詳細データ（目視推定）</p>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; padding:7px 16px; border-bottom:1px dotted #D8D6CC;">
+        <span style="font-size:12.5px; color:#5B5F53;">推定量</span>
+        <span class="mono" id="r-grams" style="font-size:13px; font-weight:500;"></span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding:7px 16px; border-bottom:1px dotted #D8D6CC;">
+        <span style="font-size:12.5px; color:#5B5F53;">たんぱく質</span>
+        <span class="mono" id="r-protein" style="font-size:13px; font-weight:500;"></span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding:7px 16px; border-bottom:1px dotted #D8D6CC;">
+        <span style="font-size:12.5px; color:#5B5F53;">脂質</span>
+        <span class="mono" id="r-fat" style="font-size:13px; font-weight:500;"></span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding:7px 16px 14px;">
+        <span style="font-size:12.5px; color:#5B5F53;">炭水化物</span>
+        <span class="mono" id="r-carbs" style="font-size:13px; font-weight:500;"></span>
+      </div>
+    </div>
+
+    <div style="background:#F1F3EC; border-radius:8px; padding:12px 14px; margin-top:12px; display:flex; gap:10px; align-items:flex-start;">
+      <div style="width:6px; height:6px; border-radius:50%; background:#7C8A6C; flex-shrink:0; margin-top:6px;"></div>
+      <p id="r-encourage" style="font-size:13px; margin:0; line-height:1.6; color:#3A3E30;"></p>
+    </div>
+
+    <p style="font-size:11px; color:#9A9D91; margin:14px 4px 0; line-height:1.6;">
+      ※ AIによる画像からの概算です。個人差があり、実際の栄養価と異なる場合があります。医療的な栄養指導・食事療法ではなく、一般的な生活習慣のアドバイスとしてご参照ください。
+    </p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'seikotsu_diet_tool_api_key';
+
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsPanel = document.getElementById('settings-panel');
+  const apiKeyInput = document.getElementById('api-key-input');
+  const saveKeyBtn = document.getElementById('save-key-btn');
+  const clearKeyBtn = document.getElementById('clear-key-btn');
+  const keyStatus = document.getElementById('key-status');
+  const noKeyNotice = document.getElementById('no-key-notice');
+
+  const zone = document.getElementById('upload-zone');
+  const input = document.getElementById('file-input');
+  const prompt = document.getElementById('upload-prompt');
+  const previewWrap = document.getElementById('preview-wrap');
+  const previewImg = document.getElementById('preview-img');
+  const analyzeBtn = document.getElementById('analyze-btn');
+  const resetBtn = document.getElementById('reset-btn');
+  const status = document.getElementById('status');
+  const errorBox = document.getElementById('error-box');
+  const result = document.getElementById('result');
+
+  let base64Data = null;
+  let mediaType = null;
+
+  function getApiKey() {
+    return localStorage.getItem(STORAGE_KEY) || '';
+  }
+
+  function refreshKeyUi() {
+    const key = getApiKey();
+    if (key) {
+      keyStatus.textContent = '保存済み（末尾: ...' + key.slice(-4) + '）';
+      noKeyNotice.style.display = 'none';
+    } else {
+      keyStatus.textContent = '未設定です';
+      noKeyNotice.style.display = 'block';
+    }
+  }
+
+  settingsBtn.addEventListener('click', () => {
+    settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+    apiKeyInput.value = '';
+  });
+
+  saveKeyBtn.addEventListener('click', () => {
+    const val = apiKeyInput.value.trim();
+    if (!val) return;
+    localStorage.setItem(STORAGE_KEY, val);
+    apiKeyInput.value = '';
+    refreshKeyUi();
+    settingsPanel.style.display = 'none';
+  });
+
+  clearKeyBtn.addEventListener('click', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    refreshKeyUi();
+  });
+
+  refreshKeyUi();
+
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.style.borderColor = '#2E4023'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = '#A9B39B'; });
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.style.borderColor = '#A9B39B';
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', () => {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1024;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        mediaType = 'image/jpeg';
+        base64Data = dataUrl.split(',')[1];
+        previewImg.src = dataUrl;
+        prompt.style.display = 'none';
+        previewWrap.style.display = 'block';
+        analyzeBtn.disabled = false;
+        analyzeBtn.style.opacity = '1';
+        resetBtn.style.display = 'inline-block';
+        errorBox.style.display = 'none';
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  resetBtn.addEventListener('click', () => {
+    base64Data = null;
+    input.value = '';
+    prompt.style.display = 'block';
+    previewWrap.style.display = 'none';
+    analyzeBtn.disabled = true;
+    analyzeBtn.style.opacity = '0.4';
+    resetBtn.style.display = 'none';
+    result.style.display = 'none';
+    errorBox.style.display = 'none';
+  });
+
+  const loadingMsgs = ['写真を確認しています…', '栄養バランスを見積もっています…', 'アドバイスをまとめています…'];
+
+  async function callApi(promptText) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      const err = new Error('APIキーが設定されていません。右上の⚙から設定してください。');
+      throw err;
+    }
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } },
+              { type: 'text', text: promptText }
+            ]
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      let detail = 'HTTP ' + response.status;
+      const raw = await response.text();
+      try {
+        const errBody = JSON.parse(raw);
+        if (errBody && errBody.error && errBody.error.message) detail = errBody.error.message;
+        else if (raw) detail = raw.slice(0, 200);
+      } catch (e) {
+        if (raw) detail = raw.slice(0, 200);
+      }
+      console.error('meal-tool API error', response.status, raw);
+      const err = new Error(detail);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json();
+  }
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!base64Data) return;
+    if (!getApiKey()) {
+      errorBox.style.display = 'block';
+      errorBox.textContent = 'APIキーが未設定です。右上の⚙から設定してください。';
+      return;
+    }
+    result.style.display = 'none';
+    errorBox.style.display = 'none';
+    analyzeBtn.disabled = true;
+    analyzeBtn.style.opacity = '0.4';
+    status.style.display = 'block';
+    let msgIndex = 0;
+    status.textContent = loadingMsgs[0];
+    const msgTimer = setInterval(() => {
+      msgIndex = (msgIndex + 1) % loadingMsgs.length;
+      status.textContent = loadingMsgs[msgIndex];
+    }, 1400);
+
+    const promptText = 'あなたは整骨院のダイエットメニューを利用する方向けに、食事写真から生活習慣のアドバイスを行うアシスタントです。断定的な医療的診断や治療的な栄養指導は行いません。「今すぐ何をすればいいか」がわかる行動しやすさと、施術者が体組成データと突き合わせて使える数値の精緻さの、両方を満たしてください。添付された食事の写真を見て、必ず以下のJSON形式のみで回答してください。マークダウンのコードフェンスや前置き、説明文は一切含めないでください。\n\n{\n  "dishes": "写っている料理・食品の簡潔な一覧（日本語）",\n  "portion_grams_low": 数値（全体の推定重量g下限）,\n  "portion_grams_high": 数値（全体の推定重量g上限）,\n  "calories_low": 数値（kcal下限）,\n  "calories_high": 数値（kcal上限）,\n  "protein_g_low": 数値（たんぱく質g下限）,\n  "protein_g_high": 数値（たんぱく質g上限）,\n  "fat_g_low": 数値（脂質g下限）,\n  "fat_g_high": 数値（脂質g上限）,\n  "carbs_g_low": 数値（炭水化物g下限）,\n  "carbs_g_high": 数値（炭水化物g上限）,\n  "one_line_verdict": "このまま食べていいか、一言で前向きに（日本語、30文字程度）",\n  "next_actions": "今すぐできる行動を優先順に1〜3個、実行しやすい具体策で（日本語、80文字程度。番号や記号を使ってよい）",\n  "eating_order": "写っている実際の料理名を挙げながらの、食べる順番の具体的なアドバイス（日本語、50文字程度）",\n  "next_time_tip": "次回の選び方・置き換えの具体案を1個（日本語、40文字程度）",\n  "encouragement": "温かく前向きな一言。数値を否定的に評価しない（日本語、30文字程度）"\n}\n\nすべての数値は写真から見える範囲での目視ベースの推定であることを前提とし、幅（下限〜上限）で示してください。断定的な言い切りは避けつつも、数値自体は具体的に算出してください。行動アドバイスを優先しつつ、数値データも省略しないでください。';
+
+    let data = null;
+    let lastErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        data = await callApi(promptText);
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        if (attempt === 0 && err.status !== undefined) {
+          status.textContent = 'もう一度試しています…';
+          await new Promise(r => setTimeout(r, 1200));
+        } else if (attempt === 0) {
+          break;
+        }
+      }
+    }
+
+    if (lastErr) {
+      clearInterval(msgTimer);
+      status.style.display = 'none';
+      errorBox.style.display = 'block';
+      errorBox.textContent = '解析に失敗しました。もう一度お試しください。（' + lastErr.message + '）';
+      analyzeBtn.disabled = false;
+      analyzeBtn.style.opacity = '1';
+      return;
+    }
+
+    try {
+      const textBlocks = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+      const cleaned = textBlocks.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+
+      document.getElementById('r-dishes').textContent = parsed.dishes || '-';
+      const lo = Math.round(parsed.calories_low || 0);
+      const hi = Math.round(parsed.calories_high || 0);
+      document.getElementById('r-cal').textContent = lo + '〜' + hi + ' kcal';
+      document.getElementById('r-verdict').textContent = parsed.one_line_verdict || '-';
+      document.getElementById('r-actions').textContent = parsed.next_actions || '-';
+      document.getElementById('r-order').textContent = parsed.eating_order || '-';
+      document.getElementById('r-tips').textContent = parsed.next_time_tip || '-';
+      document.getElementById('r-encourage').textContent = parsed.encouragement || '-';
+
+      const gLo = Math.round(parsed.portion_grams_low || 0);
+      const gHi = Math.round(parsed.portion_grams_high || 0);
+      document.getElementById('r-grams').textContent = gLo + '〜' + gHi + ' g';
+      const pLo = Math.round(parsed.protein_g_low || 0);
+      const pHi = Math.round(parsed.protein_g_high || 0);
+      document.getElementById('r-protein').textContent = pLo + '〜' + pHi + ' g';
+      const fLo = Math.round(parsed.fat_g_low || 0);
+      const fHi = Math.round(parsed.fat_g_high || 0);
+      document.getElementById('r-fat').textContent = fLo + '〜' + fHi + ' g';
+      const cLo = Math.round(parsed.carbs_g_low || 0);
+      const cHi = Math.round(parsed.carbs_g_high || 0);
+      document.getElementById('r-carbs').textContent = cLo + '〜' + cHi + ' g';
+
+      clearInterval(msgTimer);
+      status.style.display = 'none';
+      result.style.display = 'block';
+    } catch (err) {
+      clearInterval(msgTimer);
+      status.style.display = 'none';
+      errorBox.style.display = 'block';
+      errorBox.textContent = '結果の読み取りに失敗しました。もう一度お試しください。（' + err.message + '）';
+    } finally {
+      analyzeBtn.disabled = false;
+      analyzeBtn.style.opacity = '1';
+    }
+  });
+})();
+</script>
+</body>
+</html>
