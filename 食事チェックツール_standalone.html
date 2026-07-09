@@ -21,7 +21,7 @@
   <div style="text-align:center; padding: 4px 0 20px; position:relative;">
     <p class="display" style="font-size:20px; font-weight:700; letter-spacing:0.02em; margin:0; color:#2E4023;">食事チェック</p>
     <p style="font-size:12.5px; color:#6B6F63; margin:6px 0 0;">写真を送るだけで、カロリー概算と食べ方のアドバイス</p>
-    <button id="settings-btn" title="APIキー設定" style="position:absolute; top:0; right:0; width:30px; height:30px; border-radius:50%; border:1px solid #D8D6CC; background:#fff; color:#6B6F63; font-size:14px; cursor:pointer;">⚙</button>
+    <button id="settings-btn" title="APIキー設定" style="position:absolute; top:0; right:0; height:30px; padding:0 12px; border-radius:15px; border:1.5px solid #2E4023; background:#fff; color:#2E4023; font-size:12px; font-weight:500; cursor:pointer;">⚙ 設定</button>
   </div>
 
   <!-- 設定パネル -->
@@ -37,7 +37,7 @@
   </div>
 
   <div id="no-key-notice" style="display:none; background:#FFF8E8; border:1px solid #E8D9A8; border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:#5B4A1F; line-height:1.6;">
-    右上の ⚙ からAPIキーを設定すると使えるようになります。
+    上の欄にAPIキーを入力して「保存」を押すと使えるようになります。
   </div>
 
   <div id="upload-zone" style="border:1.5px dashed #A9B39B; border-radius:10px; padding:28px 16px; text-align:center; background:#F9F9F5; cursor:pointer; transition:border-color .15s;">
@@ -179,6 +179,7 @@
     } else {
       keyStatus.textContent = '未設定です';
       noKeyNotice.style.display = 'block';
+      settingsPanel.style.display = 'block';
     }
   }
 
